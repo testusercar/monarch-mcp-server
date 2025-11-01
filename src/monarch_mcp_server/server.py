@@ -15,14 +15,14 @@ import mcp.types as types
 from monarchmoney import MonarchMoney, RequireMFAException
 from pydantic import BaseModel, Field
 from smithery.decorators import smithery
-from .secure_session import secure_session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (only if .env exists)
+if os.path.exists('.env'):
+    load_dotenv()
 
 # Session-scoped client storage (Smithery handles session isolation)
 _session_clients: Dict[str, Optional[MonarchMoney]] = {}
