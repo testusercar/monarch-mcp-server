@@ -61,7 +61,8 @@ async def get_monarch_client(ctx: Context) -> MonarchMoney:
     # Get credentials from session config
     config = ctx.session_config
     
-    if not hasattr(config, 'monarch_email') or not hasattr(config, 'monarch_password'):
+    # Handle missing config gracefully (during tool scanning phase)
+    if not config or not hasattr(config, 'monarch_email') or not hasattr(config, 'monarch_password'):
         raise RuntimeError("🔐 Monarch Money credentials not configured. Please provide monarch_email and monarch_password in session config.")
     
     email = config.monarch_email
