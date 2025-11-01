@@ -67,6 +67,8 @@ disallow_untyped_defs = true
 
 [tool.smithery]
 server = "monarch_mcp_server.server:create_server"
+runtime = "python"
+python_version = "3.12"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
