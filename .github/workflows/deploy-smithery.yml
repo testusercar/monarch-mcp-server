@@ -29,7 +29,18 @@ jobs:
 
       - name: Validate pyproject.toml
         run: |
-          python -c "import tomli; f=open('pyproject.toml','rb'); print('✓ pyproject.toml is valid'); config=tomli.load(f); smithery_config=config.get('tool', {}).get('smithery', {}); print(f'✓ Smithery server: {smithery_config.get(\"server\", \"not found\")}')"
+          pip install tomli || pip install tomllib 2>/dev/null || true
+          python -c "
+          try:
+              import tomli as tomllib
+          except ImportError:
+              import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              config = tomllib.load(f)
+              smithery_config = config.get('tool', {}).get('smithery', {})
+              print('✓ pyproject.toml is valid')
+              print(f'✓ Smithery server: {smithery_config.get(\"server\", \"not found\")}')
+          "
 
       - name: Test server import
         run: |
