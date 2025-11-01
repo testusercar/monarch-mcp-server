@@ -1,3 +1,8 @@
 runtime: python
 python_version: "3.12"
+startCommand:
+  type: http
+  timeout: 30000
+  pingInterval: 5000
+  pingTimeout: 15000
 
