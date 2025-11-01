@@ -1,4 +1,3 @@
 runtime: python
 python_version: "3.12"
-entrypoint: src/monarch_mcp_server/server.py
 
