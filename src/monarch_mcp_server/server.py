@@ -128,9 +128,12 @@ The server will authenticate automatically when you use any tool."""
             is_authenticated = run_async(_check())
             
             if is_authenticated:
-                config = ctx.session_config
-                email = getattr(config, 'monarch_email', 'Not configured')
-                return f"✅ Authenticated with Monarch Money\n📧 Email: {email}\n💡 Ready to use tools"
+                config = getattr(ctx, 'session_config', None)
+                if config and hasattr(config, 'monarch_email'):
+                    email = config.monarch_email
+                    return f"✅ Authenticated with Monarch Money\n📧 Email: {email}\n💡 Ready to use tools"
+                else:
+                    return "✅ Authenticated with Monarch Money\n💡 Ready to use tools"
             else:
                 return "❌ Not authenticated. Please configure monarch_email and monarch_password in session config."
         except Exception as e:
