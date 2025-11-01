@@ -1,6 +1,10 @@
 runtime: python
 python_version: "3.12"
 startCommand:
+  - python
+  - -m
+  - monarch_mcp_server.server
+transport:
   type: http
   port: 8080
-  timeout: 30000
+  path: /mcp

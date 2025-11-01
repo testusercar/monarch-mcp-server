@@ -450,3 +450,13 @@ The server will authenticate automatically when you use any tool."""
             return f"Error refreshing accounts: {str(e)}"
     
     return mcp
+
+
+# Explicit HTTP server startup for Smithery deployment
+if __name__ == "__main__":
+    import os
+    server = create_server()
+    port = int(os.environ.get("PORT", 8080))
+    # Start HTTP transport - required for Smithery deployment
+    # This explicitly starts the HTTP server so Smithery can connect to it
+    server.run(transport="streamable-http", host="0.0.0.0", port=port, mount_path="/mcp")
