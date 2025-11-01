@@ -16,8 +16,9 @@ from monarchmoney import MonarchMoney, RequireMFAException
 from pydantic import BaseModel, Field
 from smithery.decorators import smithery
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging (only configure if not already configured)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables (only if .env exists)
