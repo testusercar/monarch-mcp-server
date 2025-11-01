@@ -1,3 +1,6 @@
 runtime: python
 python_version: "3.12"
-
+startCommand:
+  type: http
+  port: 8080
+  timeout: 30000
