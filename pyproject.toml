@@ -44,8 +44,7 @@ Homepage = "https://github.com/robcerda/monarch-mcp-server"
 Repository = "https://github.com/robcerda/monarch-mcp-server"
 Issues = "https://github.com/robcerda/monarch-mcp-server/issues"
 
-[project.scripts]
-monarch-mcp-server = "monarch_mcp_server.server:main"
+# Removed - Smithery uses create_server directly from [tool.smithery] config
 
 [tool.setuptools.packages.find]
 where = ["src"]
