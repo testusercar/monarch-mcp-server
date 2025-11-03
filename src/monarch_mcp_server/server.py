@@ -411,6 +411,27 @@ The server will authenticate automatically when you use any tool."""
 
 # Explicit HTTP server startup for Render deployment
 if __name__ == "__main__":
+    # Security warning for public deployments
+    api_key = os.getenv("MCP_API_KEY")
+    
+    if not api_key:
+        logger.warning("=" * 60)
+        logger.warning("⚠️  SECURITY WARNING: Server is publicly accessible!")
+        logger.warning("=" * 60)
+        logger.warning("⚠️  On Render's free plan, your service is PUBLIC.")
+        logger.warning("⚠️  Anyone with the URL can access your Monarch Money account!")
+        logger.warning("")
+        logger.warning("📋 Options to secure your deployment:")
+        logger.warning("  1. Use Render's Private Services (paid plan)")
+        logger.warning("  2. Deploy behind Cloudflare Access or similar auth")
+        logger.warning("  3. Use a different deployment platform with auth")
+        logger.warning("  4. Deploy locally or on a private server")
+        logger.warning("")
+        logger.warning("⚠️  Environment variables (MONARCH_EMAIL, MONARCH_PASSWORD)")
+        logger.warning("    are NOT exposed, but the service itself is accessible.")
+        logger.warning("=" * 60)
+        logger.warning("")
+    
     server = create_server()
     port = int(os.environ.get("PORT", 8080))
     # Start HTTP transport - required for Render deployment

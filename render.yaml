@@ -13,3 +13,9 @@ services:
       - key: MONARCH_MFA_CODE
         sync: false
         optional: true
+    # SECURITY NOTE: On Render's free plan, this service is PUBLICLY accessible.
+    # To secure your deployment:
+    # 1. Upgrade to Render Private Services (paid plan) - recommended for production
+    # 2. Add Cloudflare Access in front of this service (free tier available)
+    # 3. Deploy locally or on a private server
+    # See SECURITY.md for more details.
