@@ -4,4 +4,3 @@ gql>=3.4,<4.0
 keyring>=24.0.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
-smithery>=0.1.0

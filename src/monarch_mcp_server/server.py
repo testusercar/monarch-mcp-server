@@ -13,8 +13,6 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP, Context
 import mcp.types as types
 from monarchmoney import MonarchMoney, RequireMFAException
-from pydantic import BaseModel, Field
-from smithery.decorators import smithery
 
 # Configure logging (only configure if not already configured)
 if not logging.getLogger().handlers:
@@ -25,8 +23,8 @@ logger = logging.getLogger(__name__)
 if os.path.exists('.env'):
     load_dotenv()
 
-# Session-scoped client storage (Smithery handles session isolation)
-_session_clients: Dict[str, Optional[MonarchMoney]] = {}
+# Global client instance (Render: single instance per deployment)
+_monarch_client: Optional[MonarchMoney] = None
 
 def run_async(coro):
     """Run async function in a new thread with its own event loop."""
@@ -43,32 +41,21 @@ def run_async(coro):
         return future.result()
 
 
-class ConfigSchema(BaseModel):
-    """Configuration schema for session-scoped Monarch Money credentials."""
-    monarch_email: str = Field(..., description="Monarch Money email address")
-    monarch_password: str = Field(..., description="Monarch Money password")
-    mfa_code: Optional[str] = Field(default=None, description="MFA/2FA code if required")
-
-
-async def get_monarch_client(ctx: Context) -> MonarchMoney:
-    """Get or create MonarchMoney client instance for the current session."""
-    # Get session ID from context (Smithery provides this)
-    session_id = getattr(ctx, 'session_id', 'default')
+async def get_monarch_client(ctx: Context = None) -> MonarchMoney:
+    """Get or create MonarchMoney client instance using environment variables."""
+    global _monarch_client
     
-    # Check if we already have a client for this session
-    if session_id in _session_clients and _session_clients[session_id] is not None:
-        return _session_clients[session_id]
+    # Check if we already have an authenticated client
+    if _monarch_client is not None:
+        return _monarch_client
     
-    # Get credentials from session config
-    config = ctx.session_config
+    # Get credentials from environment variables
+    email = os.getenv("MONARCH_EMAIL")
+    password = os.getenv("MONARCH_PASSWORD")
+    mfa_code = os.getenv("MONARCH_MFA_CODE")
     
-    # Handle missing config gracefully (during tool scanning phase)
-    if not config or not hasattr(config, 'monarch_email') or not hasattr(config, 'monarch_password'):
-        raise RuntimeError("🔐 Monarch Money credentials not configured. Please provide monarch_email and monarch_password in session config.")
-    
-    email = config.monarch_email
-    password = config.monarch_password
-    mfa_code = getattr(config, 'mfa_code', None)
+    if not email or not password:
+        raise RuntimeError("🔐 Monarch Money credentials not configured. Please set MONARCH_EMAIL and MONARCH_PASSWORD environment variables.")
     
     try:
         # Create new client and authenticate
@@ -77,25 +64,24 @@ async def get_monarch_client(ctx: Context) -> MonarchMoney:
         # Attempt login with credentials
         try:
             await client.login(email, password)
-            logger.info(f"✅ Successfully logged into Monarch Money for session {session_id}")
+            logger.info("✅ Successfully logged into Monarch Money")
         except RequireMFAException:
             if mfa_code:
                 # If MFA code provided, use it
                 await client.login(email, password, mfa_code=mfa_code)
-                logger.info(f"✅ Successfully logged into Monarch Money with MFA for session {session_id}")
+                logger.info("✅ Successfully logged into Monarch Money with MFA")
             else:
-                raise RuntimeError("🔐 MFA required. Please provide mfa_code in session config.")
+                raise RuntimeError("🔐 MFA required. Please set MONARCH_MFA_CODE environment variable.")
         
-        # Store client for this session
-        _session_clients[session_id] = client
+        # Store client globally
+        _monarch_client = client
         return client
         
     except Exception as e:
-        logger.error(f"Failed to login to Monarch Money for session {session_id}: {e}")
+        logger.error(f"Failed to login to Monarch Money: {e}")
         raise RuntimeError(f"🔐 Authentication failed: {str(e)}")
 
 
-@smithery.server(config_schema=ConfigSchema)
 def create_server():
     """Create and configure the MCP server."""
     # Create FastMCP server
@@ -104,17 +90,17 @@ def create_server():
     @mcp.tool()
     def setup_authentication() -> str:
         """Get instructions for setting up secure authentication with Monarch Money."""
-        return """🔐 Monarch Money - Smithery Setup
+        return """🔐 Monarch Money - Render Setup
 
-Configure your Monarch Money credentials in the session config:
-• monarch_email: Your Monarch Money email address
-• monarch_password: Your Monarch Money password
-• mfa_code: Optional MFA/2FA code if required
+Configure your Monarch Money credentials as environment variables:
+• MONARCH_EMAIL: Your Monarch Money email address
+• MONARCH_PASSWORD: Your Monarch Money password
+• MONARCH_MFA_CODE: Optional MFA/2FA code if required (only set if MFA is enabled)
 
 The server will authenticate automatically when you use any tool."""
 
     @mcp.tool()
-    def check_auth_status(ctx: Context) -> str:
+    def check_auth_status(ctx: Context = None) -> str:
         """Check if already authenticated with Monarch Money."""
         try:
             # Try to get client to see if authenticated
@@ -128,44 +114,15 @@ The server will authenticate automatically when you use any tool."""
             is_authenticated = run_async(_check())
             
             if is_authenticated:
-                config = getattr(ctx, 'session_config', None)
-                if config and hasattr(config, 'monarch_email'):
-                    email = config.monarch_email
-                    return f"✅ Authenticated with Monarch Money\n📧 Email: {email}\n💡 Ready to use tools"
-                else:
-                    return "✅ Authenticated with Monarch Money\n💡 Ready to use tools"
+                email = os.getenv("MONARCH_EMAIL", "not set")
+                return f"✅ Authenticated with Monarch Money\n📧 Email: {email}\n💡 Ready to use tools"
             else:
-                return "❌ Not authenticated. Please configure monarch_email and monarch_password in session config."
+                return "❌ Not authenticated. Please set MONARCH_EMAIL and MONARCH_PASSWORD environment variables."
         except Exception as e:
             return f"Error checking auth status: {str(e)}"
 
     @mcp.tool()
-    def debug_session_loading(ctx: Context) -> str:
-        """Debug session loading for current Smithery session."""
-        try:
-            session_id = getattr(ctx, 'session_id', 'default')
-            config = ctx.session_config
-            
-            status = f"Session ID: {session_id}\n"
-            status += f"Has monarch_email: {hasattr(config, 'monarch_email')}\n"
-            
-            if hasattr(config, 'monarch_email'):
-                status += f"Email configured: {config.monarch_email}\n"
-            
-            # Check if client exists for this session
-            if session_id in _session_clients and _session_clients[session_id] is not None:
-                status += "✅ Client instance exists for this session"
-            else:
-                status += "❌ No client instance for this session yet"
-            
-            return status
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            return f"❌ Session debug failed:\nError: {str(e)}\nType: {type(e)}\nTraceback:\n{error_details}"
-
-    @mcp.tool()
-    def get_accounts(ctx: Context) -> str:
+    def get_accounts(ctx: Context = None) -> str:
         """Get all financial accounts from Monarch Money."""
         try:
             async def _get_accounts():
@@ -211,7 +168,7 @@ The server will authenticate automatically when you use any tool."""
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
             account_id: Specific account ID to filter by
-            ctx: Context object (automatically provided by Smithery)
+            ctx: Context object (automatically provided by MCP)
         """
         try:
             async def _get_transactions():
@@ -256,7 +213,7 @@ The server will authenticate automatically when you use any tool."""
 
 
     @mcp.tool()
-    def get_budgets(ctx: Context) -> str:
+    def get_budgets(ctx: Context = None) -> str:
         """Get budget information from Monarch Money."""
         try:
             async def _get_budgets():
@@ -297,7 +254,7 @@ The server will authenticate automatically when you use any tool."""
         Args:
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
-            ctx: Context object (automatically provided by Smithery)
+            ctx: Context object (automatically provided by MCP)
         """
         try:
             async def _get_cashflow():
@@ -320,13 +277,13 @@ The server will authenticate automatically when you use any tool."""
 
 
     @mcp.tool()
-    def get_account_holdings(account_id: str, ctx: Context) -> str:
+    def get_account_holdings(account_id: str, ctx: Context = None) -> str:
         """
         Get investment holdings for a specific account.
         
         Args:
             account_id: The ID of the investment account
-            ctx: Context object (automatically provided by Smithery)
+            ctx: Context object (automatically provided by MCP)
         """
         try:
             async def _get_holdings():
@@ -361,7 +318,7 @@ The server will authenticate automatically when you use any tool."""
             date: Transaction date in YYYY-MM-DD format
             category_id: Optional category ID
             merchant_name: Optional merchant name
-            ctx: Context object (automatically provided by Smithery)
+            ctx: Context object (automatically provided by MCP)
         """
         try:
             async def _create_transaction():
@@ -407,7 +364,7 @@ The server will authenticate automatically when you use any tool."""
             description: New transaction description
             category_id: New category ID
             date: New transaction date in YYYY-MM-DD format
-            ctx: Context object (automatically provided by Smithery)
+            ctx: Context object (automatically provided by MCP)
         """
         try:
             async def _update_transaction():
@@ -435,7 +392,7 @@ The server will authenticate automatically when you use any tool."""
 
 
     @mcp.tool()
-    def refresh_accounts(ctx: Context) -> str:
+    def refresh_accounts(ctx: Context = None) -> str:
         """Request account data refresh from financial institutions."""
         try:
             async def _refresh_accounts():
@@ -452,11 +409,10 @@ The server will authenticate automatically when you use any tool."""
     return mcp
 
 
-# Explicit HTTP server startup for Smithery deployment
+# Explicit HTTP server startup for Render deployment
 if __name__ == "__main__":
-    import os
     server = create_server()
     port = int(os.environ.get("PORT", 8080))
-    # Start HTTP transport - required for Smithery deployment
-    # This explicitly starts the HTTP server so Smithery can connect to it
+    # Start HTTP transport - required for Render deployment
+    # Render provides PORT environment variable automatically
     server.run(transport="streamable-http", host="0.0.0.0", port=port, mount_path="/mcp")

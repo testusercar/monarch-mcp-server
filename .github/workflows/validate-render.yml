@@ -1,4 +1,4 @@
-name: Deploy to Smithery
+name: Validate for Render
 
 on:
   push:
@@ -37,37 +37,32 @@ jobs:
               import tomllib
           with open('pyproject.toml', 'rb') as f:
               config = tomllib.load(f)
-              smithery_config = config.get('tool', {}).get('smithery', {})
               print('✓ pyproject.toml is valid')
-              print(f'✓ Smithery server: {smithery_config.get(\"server\", \"not found\")}')
           "
+
+      - name: Validate render.yaml
+        run: |
+          if [ -f render.yaml ]; then
+            echo "✓ render.yaml exists"
+          else
+            echo "❌ render.yaml not found"
+            exit 1
+          fi
 
       - name: Test server import
         run: |
           python -c "import sys; sys.path.insert(0, 'src'); from monarch_mcp_server.server import create_server; print('✓ Server imports successfully')"
 
-  deploy:
-    name: Deploy to Smithery
-    needs: validate
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy via Smithery API
-        env:
-          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+      - name: Deployment Notes
         run: |
-          echo "Repository: ${{ github.repository }}"
-          echo "Commit: ${{ github.sha }}"
-          
-          # Note: Smithery typically requires connecting the repository via web dashboard first
-          # Once connected, Smithery auto-deploys on pushes
-          # This step validates deployment readiness
-          
-          echo "✓ Repository is ready for Smithery deployment"
-          echo "✓ Ensure repository is connected in Smithery dashboard: https://smithery.ai"
-          echo "✓ Smithery will auto-deploy on successful push"
-
+          echo "✓ Repository is ready for Render deployment"
+          echo "📋 Next steps:"
+          echo "  1. Connect your GitHub repository to Render: https://render.com"
+          echo "  2. Create a new Web Service in Render"
+          echo "  3. Select this repository"
+          echo "  4. Render will auto-detect render.yaml configuration"
+          echo "  5. Set environment variables in Render dashboard:"
+          echo "     - MONARCH_EMAIL"
+          echo "     - MONARCH_PASSWORD"
+          echo "     - MONARCH_MFA_CODE (optional)"
+          echo "  6. Deploy!"
