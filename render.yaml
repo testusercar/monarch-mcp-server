@@ -6,8 +6,6 @@ services:
     buildCommand: pip install -r requirements.txt && pip install -e .
     startCommand: python -m monarch_mcp_server.server
     envVars:
-      - key: PORT
-        value: 8080
       - key: MONARCH_EMAIL
         sync: false
       - key: MONARCH_PASSWORD
