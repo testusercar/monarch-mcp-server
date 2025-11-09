@@ -142,8 +142,17 @@ export default {
     const url = new URL(request.url);
     const { method } = request;
     
+    console.log(`[REQUEST] ${method} ${url.pathname}`);
+    // Log key headers
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = key.toLowerCase() === 'authorization' ? '***REDACTED***' : value;
+    });
+    console.log(`[REQUEST] Headers:`, headers);
+    
     // Root endpoint (like Habitify pattern)
     if (url.pathname === "/" && method === "GET") {
+      console.log(`[REQUEST] Root endpoint accessed`);
       return new Response("Monarch Money MCP Server is live.", {
         headers: { "Content-Type": "text/plain" },
       });
@@ -155,11 +164,14 @@ export default {
     // Handle CORS
     const corsResponse = handleCORS(request, env);
     if (corsResponse) {
+      console.log(`[REQUEST] CORS preflight`);
       return corsResponse;
     }
 
     // Validate API key (if MCP_API_KEY is set)
+    console.log(`[AUTH] Validating API key...`);
     if (!validateApiKey(request, env)) {
+      console.error(`[AUTH] API key validation failed`);
       return new Response(
         JSON.stringify({
           jsonrpc: "2.0",
@@ -175,12 +187,20 @@ export default {
         }
       );
     }
+    console.log(`[AUTH] API key validation passed`);
 
     // Parse MCP request first (like Habitify pattern)
+    console.log(`[REQUEST] Parsing request body...`);
     let mcpRequest: any;
     try {
-      mcpRequest = await request.json();
-    } catch (error) {
+      // Clone request to read body without consuming it
+      const clonedRequest = request.clone();
+      const requestText = await clonedRequest.text();
+      console.log(`[REQUEST] Raw request body:`, requestText);
+      mcpRequest = JSON.parse(requestText);
+      console.log(`[REQUEST] Parsed MCP request:`, JSON.stringify(mcpRequest));
+    } catch (error: any) {
+      console.error(`[ERROR] Failed to parse request:`, error.message);
       return new Response(
         JSON.stringify({
           jsonrpc: "2.0",
