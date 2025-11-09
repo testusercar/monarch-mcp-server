@@ -1,0 +1,36 @@
+name = "monarch-mcp-server"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers secrets (set via: wrangler secret put MONARCH_EMAIL)
+# These secrets are stored securely and never exposed in code/logs
+# [secrets]
+# MONARCH_EMAIL = "set-via-wrangler-secret-put"
+# MONARCH_PASSWORD = "set-via-wrangler-secret-put"
+# MONARCH_MFA_CODE = "set-via-wrangler-secret-put-optional"  # 6-digit TOTP code (if not using secret key)
+# MONARCH_MFA_SECRET_KEY = "set-via-wrangler-secret-put-optional"  # MFA secret key (recommended - generates codes automatically)
+# MCP_API_KEY = "set-via-wrangler-secret-put-optional"  # Worker API key for client authentication (if not set, no validation)
+
+# Environment variables (non-sensitive config)
+[vars]
+MONARCH_API_BASE = "https://api.monarchmoney.com"
+# Optional: Restrict CORS to a specific origin (more secure)
+# ALLOWED_ORIGIN = "https://yourdomain.com"
+
+# Observability configuration
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
